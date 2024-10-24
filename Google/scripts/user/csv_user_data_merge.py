@@ -16,15 +16,8 @@ def remove_special_characters(text):
 
 def merge_user_data(intune_file, google_admin_file, output_file):
     """
-    This function merges user data from Intune and Google Admin CSV files
-    and saves a combined file with selected fields for users present in both.
-    
-    Parameters:
-    intune_file: str - Path to the Intune user data CSV file.
-    google_admin_file: str - Path to the Google Admin user data CSV file.
-    output_file: str - Path where the output merged CSV file will be saved.
+    Merges user data from Intune and Google Admin CSV files and saves the combined data.
     """
-
     # Read both CSV files
     intune_df = pd.read_csv(intune_file)
     google_admin_df = pd.read_csv(google_admin_file)
@@ -39,17 +32,17 @@ def merge_user_data(intune_file, google_admin_file, output_file):
     # Merge the data based on matching userPrincipalName and primaryEmail
     # Assuming userPrincipalName matches primaryEmail for common users
     merged_df = pd.merge(
-        intune_df, 
-        google_admin_df, 
-        left_on='userPrincipalName', 
-        right_on='primaryEmail', 
+        intune_df,
+        google_admin_df,
+        left_on='userPrincipalName',
+        right_on='primaryEmail',
         how='inner'
     )
 
-    # Keep the relevant columns, including orgUnitPath from Google Admin
+    # Keep the relevant columns
     filtered_df = merged_df[['userPrincipalName', 'jobTitle', 'department', 'companyName', 'suspended', 'orgUnitPath', 'isAdmin']]
 
-    # Save the resulting dataframe to a new CSV file
+    # Save the merged data to 'merged_user_data.csv'
     filtered_df.to_csv(output_file, index=False)
     print(f"Data successfully merged and saved to {output_file}")
 
