@@ -2,7 +2,7 @@ import pandas as pd
 import os
 import time
 import unicodedata
-from config import base_dir
+from config_user import base_dir
 
 start_time = time.time()
 

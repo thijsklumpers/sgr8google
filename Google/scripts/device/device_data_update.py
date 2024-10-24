@@ -3,7 +3,7 @@ import csv
 import time
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
-from config import SERVICE_ACCOUNT_FILE, DELEGATED_ADMIN_EMAIL, base_dir
+from config_device import SERVICE_ACCOUNT_FILE, DELEGATED_ADMIN_EMAIL, base_dir
 
 # Start timer
 start_time = time.time()

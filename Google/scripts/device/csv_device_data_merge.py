@@ -1,7 +1,7 @@
 import os
 import time
 import pandas as pd
-from config import base_dir
+from config_device import base_dir
 
 start_time = time.time()
 

@@ -2,7 +2,9 @@ import subprocess
 import os
 import time
 from colorama import Fore, Style, init
-from config import base_dir
+
+# Get the current working directory dynamically
+base_dir = os.path.dirname(os.path.abspath(__file__))
 
 # Initialize colorama
 init()

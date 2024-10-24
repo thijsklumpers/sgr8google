@@ -5,7 +5,7 @@ import re
 from collections import defaultdict
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
-from config import SERVICE_ACCOUNT_FILE, DELEGATED_ADMIN_EMAIL,base_dir
+from config_user import SERVICE_ACCOUNT_FILE, DELEGATED_ADMIN_EMAIL,base_dir
 
 start_time = time.time()
 
