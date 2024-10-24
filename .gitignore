@@ -122,3 +122,9 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+*.csv
+
+service/automatic-ou-user-sync-test-b35f84558a8c.json
+
+Google/service/automatic-ou-user-sync-test-b35f84558a8c.json
