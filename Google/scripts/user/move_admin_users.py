@@ -1,12 +1,23 @@
 import os
 import csv
 import time
+import json
 from collections import defaultdict
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
-from config_user import SERVICE_ACCOUNT_FILE, DELEGATED_ADMIN_EMAIL,base_dir
 
 start_time = time.time()
+
+# Load configuration from config.json
+config_path = os.path.join(os.path.dirname(__file__), '../../service/config.json')
+with open(config_path, 'r') as config_file:
+    config = json.load(config_file)
+
+SERVICE_ACCOUNT_FILE = config.get('SERVICE_ACCOUNT_FILE')
+DELEGATED_ADMIN_EMAIL = config.get('DELEGATED_ADMIN_EMAIL')
+
+# Define base_dir for your CSV files
+base_dir = os.path.dirname(__file__)
 
 # Define the scope and credentials
 SCOPES = [

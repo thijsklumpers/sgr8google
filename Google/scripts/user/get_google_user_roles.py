@@ -1,11 +1,21 @@
 import csv
 import os
 import time
+import json
 from googleapiclient.discovery import build
 from google.oauth2 import service_account
-from config_user import SERVICE_ACCOUNT_FILE, DELEGATED_ADMIN_EMAIL,base_dir
 
 start_time = time.time()
+
+# Load configuration from config.json
+config_path = os.path.join(os.path.dirname(__file__), '../../service/config.json')
+with open(config_path, 'r') as config_file:
+    config = json.load(config_file)
+
+# Retrieve configuration variables
+SERVICE_ACCOUNT_FILE = config.get('SERVICE_ACCOUNT_FILE')
+DELEGATED_ADMIN_EMAIL = config.get('DELEGATED_ADMIN_EMAIL')
+base_dir = config.get('base_dir', os.path.dirname(__file__))
 
 # Scopes for reading user and role information from the directory
 SCOPES = [
@@ -15,7 +25,9 @@ SCOPES = [
 
 # Authenticate using the service account
 credentials = service_account.Credentials.from_service_account_file(
-    SERVICE_ACCOUNT_FILE, scopes=SCOPES)
+    os.path.join(os.path.dirname(__file__), '../../service', SERVICE_ACCOUNT_FILE),
+    scopes=SCOPES
+)
 credentials = credentials.with_subject(DELEGATED_ADMIN_EMAIL)
 
 # Build the Admin SDK service for managing users and roles
@@ -61,7 +73,7 @@ def get_role_names():
 def write_admins_to_csv(admin_users, roles):
     """Writes admin user data to a CSV file with UTF-8 encoding."""
     # Path to the CSV file in the csv folder
-    csv_file_path = os.path.join(base_dir, '../../csv/user/core/admin_google_user_data.csv')
+    csv_file_path = os.path.join(base_dir, 'csv', 'user', 'core', 'admin_google_user_data.csv')
 
     # Define the CSV columns you want
     fields = ['roleName', 'userPrincipalName', 'suspended', 'orgUnitPath']
@@ -102,13 +114,14 @@ def write_admins_to_csv(admin_users, roles):
     unique_users = {data['userPrincipalName'] for data in admin_data_list}
     print(f"{len(admin_data_list)} roles assigned to {len(unique_users)} unique users")
 
-# Fetch the role names
-roles = get_role_names()
+if __name__ == "__main__":
+    # Fetch the role names
+    roles = get_role_names()
 
-# Fetch the admin user data
-admin_users = get_admin_users()
+    # Fetch the admin user data
+    admin_users = get_admin_users()
 
-# Write the admin data to CSV
-write_admins_to_csv(admin_users, roles)
+    # Write the admin data to CSV
+    write_admins_to_csv(admin_users, roles)
 
 print("Getting admin user data took --- %s seconds ---" % (time.time() - start_time))

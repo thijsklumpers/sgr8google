@@ -1,9 +1,17 @@
 import os
 import time
 import pandas as pd
-from config_device import base_dir
+import json
 
 start_time = time.time()
+
+# Load configuration from config.json
+config_path = os.path.join(os.path.dirname(__file__), '../../service/config.json')
+with open(config_path, 'r') as config_file:
+    config = json.load(config_file)
+
+# Define base_dir for your CSV files
+base_dir = os.path.dirname(__file__)
 
 # Load device data from Google
 exported_device_data_file = os.path.join(base_dir, '../../csv/device/core/all_google_device_data.csv')

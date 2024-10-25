@@ -4,10 +4,20 @@ import os
 import time
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
-from config_device import SERVICE_ACCOUNT_FILE, DELEGATED_ADMIN_EMAIL, base_dir
 
 # Start timer
 start_time = time.time()
+
+# Load configuration from config.json
+config_path = os.path.join(os.path.dirname(__file__), '../../service/config.json')
+with open(config_path, 'r') as config_file:
+    config = json.load(config_file)
+
+SERVICE_ACCOUNT_FILE = config.get('SERVICE_ACCOUNT_FILE')
+DELEGATED_ADMIN_EMAIL = config.get('DELEGATED_ADMIN_EMAIL')
+
+# Define base_dir for your CSV files
+base_dir = os.path.dirname(__file__)
 
 # Get the current working directory dynamically
 SERVICE_ACCOUNT_FILE = os.path.join(base_dir, '../../service/automatic-ou-user-sync-test-b35f84558a8c.json')
