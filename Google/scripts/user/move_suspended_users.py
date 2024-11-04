@@ -30,7 +30,7 @@ credentials = credentials.with_subject(DELEGATED_ADMIN_EMAIL)
 service = build('admin', 'directory_v1', credentials=credentials, cache_discovery=False)
 
 # Path to your CSV file
-csv_file_path = os.path.join(base_dir, '../../csv/user/merged_data.csv')
+csv_file_path = os.path.join(base_dir, '../../csv/user/merged/merged_data.csv')
 
 # Initialize dictionaries to track suspended and moved users per domain (school)
 suspended_users_count_per_school = defaultdict(int)

@@ -15,7 +15,7 @@ with open(config_path, 'r') as config_file:
 # Retrieve configuration variables
 SERVICE_ACCOUNT_FILE = config.get('SERVICE_ACCOUNT_FILE')
 DELEGATED_ADMIN_EMAIL = config.get('DELEGATED_ADMIN_EMAIL')
-base_dir = config.get('base_dir', os.path.dirname(__file__))
+base_dir = os.path.join(os.path.dirname(__file__))
 
 # Scopes for reading user and role information from the directory
 SCOPES = [
@@ -73,7 +73,7 @@ def get_role_names():
 def write_admins_to_csv(admin_users, roles):
     """Writes admin user data to a CSV file with UTF-8 encoding."""
     # Path to the CSV file in the csv folder
-    csv_file_path = os.path.join(base_dir, 'csv', 'user', 'core', 'admin_google_user_data.csv')
+    csv_file_path = os.path.join(base_dir, '../../csv/user/core/admin_google_user_data.csv')
 
     # Define the CSV columns you want
     fields = ['roleName', 'userPrincipalName', 'suspended', 'orgUnitPath']

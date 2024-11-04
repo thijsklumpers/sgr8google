@@ -34,7 +34,7 @@ service = build('admin', 'directory_v1', credentials=credentials)
 base_dir = os.path.dirname(__file__)
 
 # Path to your CSV file
-csv_file_path = os.path.join(base_dir, '../../csv/user/merged_user_data.csv')
+csv_file_path = os.path.join(base_dir, '../../csv/user/merged/merged_user_data.csv')
 
 # Initialize dictionaries to track users per domain (school)
 moved_users_count_per_school = defaultdict(int)

@@ -15,7 +15,7 @@ with open(config_path, 'r') as config_file:
 # Retrieve configuration variables
 SERVICE_ACCOUNT_FILE = config.get('SERVICE_ACCOUNT_FILE')
 DELEGATED_ADMIN_EMAIL = config.get('DELEGATED_ADMIN_EMAIL')
-base_dir = config.get('base_dir', os.path.dirname(__file__))
+base_dir = os.path.join(os.path.dirname(__file__))
 
 # Scope for reading user information from the directory
 SCOPES = ['https://www.googleapis.com/auth/admin.directory.user.readonly']
@@ -50,7 +50,7 @@ def get_all_google_users():
 def write_to_csv(users):
     """Writes user data to a CSV file with UTF-8 encoding."""
     # Path to the CSV file in the csv folder
-    csv_file_path = os.path.join(base_dir, 'csv', 'user', 'core', 'all_google_user_data.csv')
+    csv_file_path = os.path.join(base_dir, '../../csv/user/core/all_google_user_data.csv')
 
     # Ensure the directory exists
     os.makedirs(os.path.dirname(csv_file_path), exist_ok=True)

@@ -53,12 +53,12 @@ if __name__ == "__main__":
         config = json.load(config_file)
 
     # Retrieve base_dir from the configuration, defaulting to the script's directory if not set
-    base_dir = config.get('base_dir', os.path.dirname(__file__))
+    base_dir = os.path.join(os.path.dirname(__file__))
 
     # Dynamically construct paths relative to base_dir
     intune_file = os.path.join(base_dir, 'csv', 'user', 'core', 'multi_school_intune.csv')
     google_admin_file = os.path.join(base_dir, 'csv', 'user', 'core', 'all_google_user_data.csv')
-    output_file = os.path.join(base_dir, 'csv', 'user', 'merged_user_data.csv')
+    output_file = os.path.join(base_dir, 'csv', 'user', 'merged', 'merged_user_data.csv')
 
     # Call the function with dynamically resolved file paths
     merge_user_data(intune_file, google_admin_file, output_file)
