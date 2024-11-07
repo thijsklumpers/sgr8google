@@ -76,7 +76,7 @@ def write_admins_to_csv(admin_users, roles):
     csv_file_path = os.path.join(base_dir, '../../csv/user/core/admin_google_user_data.csv')
 
     # Define the CSV columns you want
-    fields = ['roleName', 'userPrincipalName', 'suspended', 'orgUnitPath']
+    fields = ['roleName', 'userPrincipalName', 'suspended', 'userOrgUnitPath', 'roleScopeType']
 
     # Fetch all users to get additional details
     all_users = {user['id']: user for user in get_all_google_users()}
@@ -91,11 +91,14 @@ def write_admins_to_csv(admin_users, roles):
         user = all_users.get(user_id, {})
 
         # Parse admin details
+        scope_type = admin.get('scopeType', 'UNKNOWN')
+
         admin_data = {
             'roleName': roles.get(admin.get('roleId'), 'Unknown'),
             'userPrincipalName': user.get('primaryEmail', ''),
             'suspended': user.get('suspended', False),
-            'orgUnitPath': user.get('orgUnitPath', '')
+            'userOrgUnitPath': user.get('orgUnitPath', ''),
+            'roleScopeType': scope_type
         }
         admin_data_list.append(admin_data)
 
