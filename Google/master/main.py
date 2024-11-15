@@ -21,6 +21,7 @@ move_suspended_users_path = os.path.join(base_dir, '../scripts/user/move_suspend
 move_leerling_to_ou_path = os.path.join(base_dir, '../scripts/user/move_leerling_to_ou.py')
 move_admin_users_path = os.path.join(base_dir, '../scripts/user/move_admin_users.py')
 move_users_to_ou_path = os.path.join(base_dir, '../scripts/user/move_users_to_ou.py')
+csv_user_data_splitting_path = os.path.join(base_dir, '../scripts/user/csv_user_data_splitting.py')
 
 # Devices
 google_device_data_pull_path = os.path.join(base_dir, '../scripts/device/google_device_data_pull.py')
@@ -41,6 +42,11 @@ def run_csv_user_data_merge():
     print(Fore.RED + "Started: csv_user_data_merge.py ...")
     print(Style.RESET_ALL + "csv_user_data_merge.py logs:")
     subprocess.run(['python', csv_user_data_merge_path])
+
+def run_csv_user_data_splitting():
+    print(Fore.RED + "Started: csv_user_data_splitting.py ...")
+    print(Style.RESET_ALL + "csv_user_data_splitting.py logs:")
+    subprocess.run(['python', csv_user_data_splitting_path])
 
 # Devices
 def run_google_device_data_pull():
@@ -91,6 +97,7 @@ if __name__ == '__main__':
     # Users
     run_google_user_data_pull()
     run_csv_user_data_merge()
+    run_csv_user_data_splitting()
     # Devices
     run_google_device_data_pull()
     run_csv_device_data_merge()
@@ -107,6 +114,6 @@ if __name__ == '__main__':
     # Moving of users to there correct OU's / If the OU doesn't exist yet they will be created
     run_move_suspended_users()
     run_move_admin_users()
-    run_move_users_to_ou()
+    # run_move_users_to_ou()
 
 print(Fore.GREEN + "Full process finished in --- %s seconds ---" % (time.time() - start_time))
