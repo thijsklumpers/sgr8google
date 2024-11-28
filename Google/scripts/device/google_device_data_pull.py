@@ -52,7 +52,10 @@ def write_to_csv(devices, filename):
     csv_file_path = os.path.join(base_dir, f'../../csv/device/core/{filename}')
 
     # Define the CSV columns you want
-    fields = ['deviceId', 'serialNumber', 'model', 'status', 'lastSync', 'assetId', 'location', 'lastKnownUserEmail']
+    fields = [
+        'deviceId', 'serialNumber', 'model', 'status', 'lastSync', 
+        'assetId', 'location', 'lastKnownUserEmail', 'orgUnitPath'
+    ]
 
     # Open a CSV file to write with UTF-8 encoding
     with open(csv_file_path, mode='w', newline='', encoding='utf-8') as csv_file:
@@ -72,7 +75,8 @@ def write_to_csv(devices, filename):
                 'lastSync': device.get('lastSync', 'N/A'),
                 'assetId': device.get('annotatedAssetId', 'N/A'),
                 'location': device.get('annotatedLocation', 'N/A'),
-                'lastKnownUserEmail': last_known_user_email
+                'lastKnownUserEmail': last_known_user_email,
+                'orgUnitPath': device.get('orgUnitPath', 'N/A')
             }
             writer.writerow(device_data)
 
@@ -82,5 +86,5 @@ def write_to_csv(devices, filename):
 if __name__ == '__main__':
     chrome_devices = list_chrome_devices()
     write_to_csv(chrome_devices, 'all_google_device_data.csv')
-    
+
 print("Getting google device data took --- %s seconds ---" % (time.time() - start_time))
