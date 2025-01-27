@@ -59,7 +59,7 @@ def create_groups_in_batch(domain, group_names):
         create_group(group_name, normalized_domain)
 
 if __name__ == "__main__":
-    print("Welcome to the Batch Group Creation Script!")
+    print("Welcome to the Group Creation Script!")
     
     # Get the domain
     domain = input("Enter the domain: ").strip()
