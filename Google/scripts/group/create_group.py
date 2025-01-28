@@ -11,8 +11,11 @@ with open(config_path, 'r') as config_file:
 SERVICE_ACCOUNT_FILE = config.get('SERVICE_ACCOUNT_FILE')
 DELEGATED_ADMIN_EMAIL = config.get('DELEGATED_ADMIN_EMAIL')
 
-# OAuth scope for group management
-SCOPES = ['https://www.googleapis.com/auth/admin.directory.group']
+# OAuth scope for group and group member management
+SCOPES = [
+    'https://www.googleapis.com/auth/admin.directory.group',
+    'https://www.googleapis.com/auth/admin.directory.group.member'
+]
 
 # Authenticate using the service account and delegated admin
 credentials = service_account.Credentials.from_service_account_file(
@@ -44,19 +47,65 @@ def create_group(group_name, domain):
     try:
         group = service.groups().insert(body=group_body).execute()
         print(f"Group created successfully: {group['email']}")
+        return group
     except Exception as e:
         if 'Entity already exists' in str(e):
             print(f"Group already exists: {group_email}")
+            return None
         else:
             print(f"An error occurred while creating group {group_email}: {e}")
+            return None
+
+def add_admin_as_owner(group_email, admin_email):
+    """
+    Adds the admin as an owner of the group if they are not already an owner.
+    """
+    try:
+        # Retrieve all members of the group
+        members = service.members().list(groupKey=group_email).execute()
+        
+        # Check if the admin is already an owner
+        if 'members' in members:
+            for member in members['members']:
+                if member['email'] == admin_email and member['role'] == 'OWNER':
+                    print(f"Admin {admin_email} is already an owner of {group_email}.")
+                    return
+        
+        # Add the admin as an owner
+        member_body = {
+            "email": admin_email,
+            "role": "OWNER"
+        }
+        service.members().insert(groupKey=group_email, body=member_body).execute()
+        print(f"Admin {admin_email} added as an owner of {group_email}.")
+    except Exception as e:
+        print(f"An error occurred while adding admin as owner: {e}")
 
 def create_groups_in_batch(domain, group_names):
     """
-    Creates multiple Google Groups in the specified domain.
+    Creates multiple Google Groups in the specified domain and adds the admin as an owner.
     """
     normalized_domain = normalize_domain(domain)
+    admin_email = f"admin{normalized_domain}"
+    
     for group_name in group_names:
-        create_group(group_name, normalized_domain)
+        group_email = f"{group_name}{normalized_domain}"
+        
+        # Check if the group already exists
+        try:
+            existing_group = service.groups().get(groupKey=group_email).execute()
+            print(f"Group already exists: {group_email}")
+        except Exception as e:
+            if 'Not Found' in str(e):
+                # Group does not exist, create it
+                existing_group = create_group(group_name, normalized_domain)
+            else:
+                print(f"An error occurred while checking group {group_email}: {e}")
+                continue
+        
+        # Add the admin as an owner if the group exists
+        if existing_group:
+            add_admin_as_owner(group_email, admin_email)
 
 if __name__ == "__main__":
     print("Welcome to the Group Creation Script!")
