@@ -7,9 +7,6 @@ from google.oauth2 import service_account
 
 start_time = time.time()
 
-# ------------------------------------------------------------------------------
-# 1. Load Configuration
-# ------------------------------------------------------------------------------
 config_path = os.path.join(os.path.dirname(__file__), '../../service/config.json')
 with open(config_path, 'r') as config_file:
     config = json.load(config_file)
@@ -18,28 +15,21 @@ SERVICE_ACCOUNT_FILE = config.get('SERVICE_ACCOUNT_FILE')
 DELEGATED_ADMIN_EMAIL = config.get('DELEGATED_ADMIN_EMAIL')
 base_dir = os.path.join(os.path.dirname(__file__))
 
-# ------------------------------------------------------------------------------
-# 2. Define the required OAuth Scope
-#    For reading groups, use https://www.googleapis.com/auth/admin.directory.group.readonly
-# ------------------------------------------------------------------------------
-SCOPES = ['https://www.googleapis.com/auth/admin.directory.group.readonly']
+SCOPES = [
+    'https://www.googleapis.com/auth/admin.directory.group.readonly',
+    'https://www.googleapis.com/auth/admin.directory.group.member.readonly'
+]
 
-# ------------------------------------------------------------------------------
-# 3. Authenticate using the service account & delegated admin
-# ------------------------------------------------------------------------------
 credentials = service_account.Credentials.from_service_account_file(
     os.path.join(os.path.dirname(__file__), '../../service', SERVICE_ACCOUNT_FILE),
     scopes=SCOPES
 )
 credentials = credentials.with_subject(DELEGATED_ADMIN_EMAIL)
 
-# ------------------------------------------------------------------------------
-# 4. Build the Admin SDK Directory service (for Groups)
-# ------------------------------------------------------------------------------
 service = build('admin', 'directory_v1', credentials=credentials)
 
 # ------------------------------------------------------------------------------
-# 5. Function to retrieve all groups
+# Function to retrieve all groups
 # ------------------------------------------------------------------------------
 def get_all_google_groups():
     """
@@ -60,12 +50,32 @@ def get_all_google_groups():
     return results
 
 # ------------------------------------------------------------------------------
-# 6. Write group data to CSV
+# Function to retrieve owners of a group
+# ------------------------------------------------------------------------------
+def get_group_owners(group_email):
+    """
+    Fetches the owners of a group by filtering members with the OWNER role.
+    """
+    owners = []
+    request = service.members().list(
+        groupKey=group_email,
+        roles='OWNER'  # Use 'OWNER' instead of 'MANAGER'
+    )
+
+    while request is not None:
+        response = request.execute()
+        owners.extend(response.get('members', []))
+        request = service.members().list_next(previous_request=request, previous_response=response)
+
+    return owners
+
+# ------------------------------------------------------------------------------
+# Write group data to CSV
 # ------------------------------------------------------------------------------
 def write_groups_to_csv(groups):
     """
     Writes group data to a CSV file with UTF-8 encoding.
-    Modify the fields array based on the attributes you want to capture.
+    Includes group owners in the output.
     """
     csv_file_path = os.path.join(base_dir, '../../csv/groups/core/all_google_group_data.csv')
 
@@ -79,7 +89,8 @@ def write_groups_to_csv(groups):
         'description', 
         'directMembersCount', 
         'adminCreated', 
-        'aliases'
+        'aliases',
+        'owners'  # New column for group owners
     ]
 
     with open(csv_file_path, mode='w', newline='', encoding='utf-8') as csv_file:
@@ -87,6 +98,10 @@ def write_groups_to_csv(groups):
         writer.writeheader()
 
         for group in groups:
+            # Fetch owners for the group
+            owners = get_group_owners(group['email'])
+            owner_emails = [owner.get('email', '') for owner in owners]
+
             # Build a dict for each row
             group_data = {
                 'email': group.get('email', ''),
@@ -95,14 +110,16 @@ def write_groups_to_csv(groups):
                 'directMembersCount': group.get('directMembersCount', ''),
                 'adminCreated': group.get('adminCreated', ''),
                 # 'aliases' is a list of strings, so we can join them with commas
-                'aliases': ', '.join(group.get('aliases', []))
+                'aliases': ', '.join(group.get('aliases', [])),
+                # 'owners' is a list of emails, so we can join them with commas
+                'owners': ', '.join(owner_emails)
             }
             writer.writerow(group_data)
 
     print(f"CSV file written to: {csv_file_path}")
 
 # ------------------------------------------------------------------------------
-# 7. Main execution: fetch groups, write to CSV
+# Main execution: fetch groups, write to CSV
 # ------------------------------------------------------------------------------
 if __name__ == "__main__":
     groups = get_all_google_groups()
