@@ -1,7 +1,10 @@
 import os
 import json
+import time
 from googleapiclient.discovery import build
 from google.oauth2 import service_account
+
+start_time = time.time()
 
 # Load configuration
 config_path = os.path.join(os.path.dirname(__file__), '../../service/config.json')
@@ -127,3 +130,5 @@ if __name__ == "__main__":
         create_groups_in_batch(domain, group_names)
     else:
         print("No valid group names provided. Exiting.")
+
+    print("Creating groups took --- %s seconds ---" % (time.time() - start_time))
