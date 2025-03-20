@@ -16,6 +16,9 @@ with open(config_path, 'r') as config_file:
 SERVICE_ACCOUNT_FILE = config.get('SERVICE_ACCOUNT_FILE')
 DELEGATED_ADMIN_EMAIL = config.get('DELEGATED_ADMIN_EMAIL')
 
+# Construct the full path to the service account file
+service_account_file_path = os.path.join(os.path.dirname(__file__), '../../service', SERVICE_ACCOUNT_FILE)
+
 # Define base_dir for your CSV files
 base_dir = os.path.dirname(__file__)
 
@@ -25,12 +28,12 @@ SCOPES = [
     'https://www.googleapis.com/auth/admin.directory.orgunit'
 ]
 
-credentials = service_account.Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=SCOPES)
+credentials = service_account.Credentials.from_service_account_file(service_account_file_path, scopes=SCOPES)
 credentials = credentials.with_subject(DELEGATED_ADMIN_EMAIL)
 service = build('admin', 'directory_v1', credentials=credentials, cache_discovery=False)
 
 # Path to your CSV file
-csv_file_path = os.path.join(base_dir, '../../csv/user/merged/merged_data.csv')
+csv_file_path = os.path.join(base_dir, '../../csv/user/split/split_suspended_google_users.csv')
 
 # Initialize dictionaries to track suspended and moved users per domain (school)
 suspended_users_count_per_school = defaultdict(int)
