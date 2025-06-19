@@ -5,89 +5,111 @@ import json
 from googleapiclient.discovery import build
 from google.oauth2 import service_account
 
+# ──────────────────────────────────────────────────────────────
+# 1.  Config & authentication
+# ──────────────────────────────────────────────────────────────
 start_time = time.time()
 
-# Load configuration from config.json
-config_path = os.path.join(os.path.dirname(__file__), '../../service/config.json')
-with open(config_path, 'r') as config_file:
-    config = json.load(config_file)
+CONFIG_PATH = os.path.join(os.path.dirname(__file__), '../../service/config.json')
+with open(CONFIG_PATH, 'r', encoding='utf-8') as f:
+    cfg = json.load(f)
 
-# Retrieve configuration variables
-SERVICE_ACCOUNT_FILE = config.get('SERVICE_ACCOUNT_FILE')
-DELEGATED_ADMIN_EMAIL = config.get('DELEGATED_ADMIN_EMAIL')
-base_dir = os.path.join(os.path.dirname(__file__))
+SERVICE_ACCOUNT_FILE = cfg['SERVICE_ACCOUNT_FILE']
+DELEGATED_ADMIN_EMAIL = cfg['DELEGATED_ADMIN_EMAIL']
+BASE_DIR = os.path.dirname(__file__)
 
-# Scope for reading user information from the directory
 SCOPES = ['https://www.googleapis.com/auth/admin.directory.user.readonly']
 
-# Authenticate using the service account
-credentials = service_account.Credentials.from_service_account_file(
-    os.path.join(os.path.dirname(__file__), '../../service', SERVICE_ACCOUNT_FILE),
-    scopes=SCOPES
+creds = (
+    service_account.Credentials
+    .from_service_account_file(
+        os.path.join(os.path.dirname(__file__), '../../service', SERVICE_ACCOUNT_FILE),
+        scopes=SCOPES
+    )
+    .with_subject(DELEGATED_ADMIN_EMAIL)
 )
-credentials = credentials.with_subject(DELEGATED_ADMIN_EMAIL)
 
-# Build the Admin SDK service for managing users
-service = build('admin', 'directory_v1', credentials=credentials)
+service = build('admin', 'directory_v1', credentials=creds)
 
-def get_all_google_users():
-    """Fetches all users from the domain."""
-    results = []
-    request = service.users().list(
+# ──────────────────────────────────────────────────────────────
+# 2.  Helpers
+# ──────────────────────────────────────────────────────────────
+def get_department(user: dict) -> str:
+    """
+    Extract the department name from users.organizations[].
+    Returns an empty string if none is present.
+    """
+    for org in user.get('organizations', []):
+        if org.get('primary'):
+            return org.get('department', '')
+    if user.get('organizations'):
+        return user['organizations'][0].get('department', '')
+    return ''
+
+def normalize_last_login(ts: str | None) -> str:
+    """
+    Convert the Workspace “never logged in” sentinel value
+    (1970-01-01T00:00:00.000Z) to the string 'noLogin'.
+    """
+    if not ts or ts.startswith('1970'):
+        return 'noLogin'
+    return ts
+
+def get_all_google_users() -> list[dict]:
+    """Fetch all users in the domain (projection='full' gives all attributes)."""
+    all_users = []
+    req = service.users().list(
         customer='my_customer',
         maxResults=500,
         orderBy='email',
-        projection='full'  # Get all user attributes
+        projection='full'
     )
 
-    while request is not None:
-        response = request.execute()
-        results.extend(response.get('users', []))
-        request = service.users().list_next(previous_request=request, previous_response=response)
+    while req is not None:
+        resp = req.execute()
+        all_users.extend(resp.get('users', []))
+        req = service.users().list_next(previous_request=req, previous_response=resp)
 
-    return results
+    return all_users
 
-def write_to_csv(users):
-    """Writes user data to a CSV file with UTF-8 encoding."""
-    # Path to the CSV file in the csv folder
-    csv_file_path = os.path.join(base_dir, '../../csv/user/core/all_google_user_data.csv')
 
-    # Ensure the directory exists
-    os.makedirs(os.path.dirname(csv_file_path), exist_ok=True)
+def write_to_csv(users: list[dict]) -> None:
+    """Write selected attributes to CSV (UTF-8)."""
+    csv_path = os.path.join(BASE_DIR, '../../csv/user/core/all_google_user_data.csv')
+    os.makedirs(os.path.dirname(csv_path), exist_ok=True)
 
-    # Define the CSV columns you want
     fields = [
         'primaryEmail', 'firstName', 'lastName', 'orgUnitPath',
+        'department',                      # ← NEW COLUMN
         'lastLoginTime', 'suspended', 'isAdmin', 'updated'
     ]
-    
-    # Open a CSV file to write with UTF-8 encoding
-    with open(csv_file_path, mode='w', newline='', encoding='utf-8') as csv_file:
-        writer = csv.DictWriter(csv_file, fieldnames=fields)
+
+    with open(csv_path, mode='w', newline='', encoding='utf-8') as fh:
+        writer = csv.DictWriter(fh, fieldnames=fields)
         writer.writeheader()
 
         for user in users:
-            # Parse user details
-            user_data = {
-                'primaryEmail': user.get('primaryEmail'),
-                'firstName': user['name'].get('givenName', ''),
-                'lastName': user['name'].get('familyName', ''),
-                'orgUnitPath': user.get('orgUnitPath', ''),
-                'lastLoginTime': user.get('lastLoginTime', 'Never'),
-                'suspended': user.get('suspended', False),
-                'isAdmin': user.get('isAdmin', False),
-                'updated': user.get('updated', '')
-            }
-            writer.writerow(user_data)
+            writer.writerow({
+                'primaryEmail':  user.get('primaryEmail', ''),
+                'firstName':     user.get('name', {}).get('givenName', ''),
+                'lastName':      user.get('name', {}).get('familyName', ''),
+                'orgUnitPath':   user.get('orgUnitPath', ''),
+                'department':    get_department(user),
+                'lastLoginTime': normalize_last_login(user.get('lastLoginTime')),
+                'suspended':     user.get('suspended', False),
+                'isAdmin':       user.get('isAdmin', False),
+                'updated':       user.get('updated', '')
+            })
 
-    print(f"CSV file written to: {csv_file_path}")
+    print(f"CSV written ➜ {csv_path}")
 
-if __name__ == "__main__":
-    # Fetch the user data
+
+# ──────────────────────────────────────────────────────────────
+# 3.  Main
+# ──────────────────────────────────────────────────────────────
+if __name__ == '__main__':
     users = get_all_google_users()
-
-    # Write the data to CSV
     write_to_csv(users)
 
-print(f"Successfully written {len(users)} users to all_google_user_data.csv")
-print("Getting Google user data took --- %s seconds ---" % (time.time() - start_time))
+    print(f"Successfully wrote {len(users)} users to all_google_user_data.csv")
+    print(f"Elapsed time: {(time.time() - start_time):.2f}s")
