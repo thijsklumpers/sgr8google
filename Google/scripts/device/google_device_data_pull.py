@@ -3,10 +3,16 @@ import csv
 import os
 import time
 import re
+from collections import defaultdict
+from typing import List, Dict
+
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 
-# Start timer
+# ────────────────────────────────────────────────────────────────────────────────
+# Configuration & Google API initialisation
+# ────────────────────────────────────────────────────────────────────────────────
+
 start_time = time.time()
 
 # Load configuration from config.json
@@ -17,26 +23,39 @@ with open(config_path, 'r') as config_file:
 SERVICE_ACCOUNT_FILE = config.get('SERVICE_ACCOUNT_FILE')
 DELEGATED_ADMIN_EMAIL = config.get('DELEGATED_ADMIN_EMAIL')
 
-# Define base_dir for your CSV files
+# Directory that will hold the CSV output (already exists in your repo hierarchy)
 base_dir = os.path.dirname(__file__)
+output_dir = os.path.join(base_dir, '../../csv/device/core')
 
-# Scopes required for the API
+# Scopes required for the Admin SDK Directory API
 SCOPES = ['https://www.googleapis.com/auth/admin.directory.device.chromeos.readonly']
 
-# Create credentials using the service account
+# Create credentials using the service account and delegate to the super‑admin
 credentials = service_account.Credentials.from_service_account_file(
-    os.path.join(base_dir, '../../service', SERVICE_ACCOUNT_FILE), scopes=SCOPES)
+    os.path.join(base_dir, '../../service', SERVICE_ACCOUNT_FILE), scopes=SCOPES
+).with_subject(DELEGATED_ADMIN_EMAIL)
 
-
-# Delegate the credentials to the admin
-credentials = credentials.with_subject(DELEGATED_ADMIN_EMAIL)
-
-# Build the service
+# Build the service client (Admin SDK → ChromeOS devices)
 service = build('admin', 'directory_v1', credentials=credentials)
 
+# Supported / expected device‑status values (API returns upper‑case values)
+STATUSES_OF_INTEREST: List[str] = [
+    'ACTIVE',          # "Provisioned" in Admin Console
+    'PRE_PROVISIONED', # "Pre‑provisioned"
+    'DEPROVISIONED',
+    'DISABLED',
+    'SUSPENDED'
+]
 
-def list_chrome_devices():
-    devices = []
+ROOT_DISPLAY = '@root'  # what should appear in CSV when the device sits in the tenant root
+
+# ────────────────────────────────────────────────────────────────────────────────
+# Helper functions
+# ────────────────────────────────────────────────────────────────────────────────
+
+def list_chrome_devices() -> List[dict]:
+    """Retrieve **all** ChromeOS devices for the customer (pagination handled)."""
+    devices: List[dict] = []
     request = service.chromeosdevices().list(customerId='my_customer')
     while request is not None:
         response = request.execute()
@@ -45,32 +64,28 @@ def list_chrome_devices():
     return devices
 
 
-def sanitize_domain(domain):
-    # Remove special characters and domain extensions
-    sanitized = re.sub(r'[^a-zA-Z0-9]', '', domain.split('.')[0])
-    return sanitized
+def sanitize_domain(domain: str) -> str:
+    """Return a filesystem‑safe string for a school domain (first OU segment)."""
+    return re.sub(r'[^a-zA-Z0-9]', '', domain.split('.')[0]) or 'root'
 
 
-def write_to_csv(devices, filename):
-    csv_file_path = os.path.join(base_dir, f'../../csv/device/core/{filename}')
-
-    # Define the CSV columns you want
+def write_raw_devices_csv(devices: List[dict], filename: str) -> None:
+    """Dump raw device inventory to *filename* (with a fixed field order)."""
+    csv_file_path = os.path.join(output_dir, filename)
     fields = [
-        'deviceId', 'serialNumber', 'model', 'status', 'lastSync', 
+        'deviceId', 'serialNumber', 'model', 'status', 'lastSync',
         'assetId', 'location', 'lastKnownUserEmail', 'orgUnitPath'
     ]
 
-    # Open a CSV file to write with UTF-8 encoding
-    with open(csv_file_path, mode='w', newline='', encoding='utf-8') as csv_file:
+    with open(csv_file_path, 'w', newline='', encoding='utf-8') as csv_file:
         writer = csv.DictWriter(csv_file, fieldnames=fields)
         writer.writeheader()
 
         for device in devices:
-            # Parse device details
             recent_users = device.get('recentUsers', [])
             last_known_user_email = recent_users[0].get('email', 'N/A') if recent_users else 'N/A'
 
-            device_data = {
+            writer.writerow({
                 'deviceId': device.get('deviceId'),
                 'serialNumber': device.get('serialNumber', 'N/A'),
                 'model': device.get('model', 'N/A'),
@@ -80,33 +95,69 @@ def write_to_csv(devices, filename):
                 'location': device.get('annotatedLocation', 'N/A'),
                 'lastKnownUserEmail': last_known_user_email,
                 'orgUnitPath': device.get('orgUnitPath', 'N/A')
-            }
-            writer.writerow(device_data)
+            })
 
-    print(f"CSV file written to: {csv_file_path}")
+    print(f"Raw CSV written → {csv_file_path}")
 
+
+def write_status_summary(devices: List[dict], filename: str = 'google_device_status_summary.csv') -> None:
+    """Write a CSV containing counts per *schoolDomain* for every status in
+    ``STATUSES_OF_INTEREST`` (plus any new/unknown ones). Devices located in the
+    tenant root OU are reported as ``@root``.
+    """
+
+    # Prepare data → {schoolDomain: {status: count}}
+    summary: Dict[str, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
+
+    for device in devices:
+        org_unit_path: str = device.get('orgUnitPath', '')
+        first_segment = org_unit_path.strip('/').split('/')[0] if org_unit_path else ''
+        school_domain = first_segment or ROOT_DISPLAY  # '@root' if blank
+
+        status = device.get('status', 'UNKNOWN').upper()
+        summary[school_domain][status] += 1
+
+    # Determine all status columns (pre‑defined + any new ones we encountered)
+    encountered_statuses = {status for counts in summary.values() for status in counts}
+    status_columns: List[str] = [s for s in STATUSES_OF_INTEREST if s in encountered_statuses]
+    status_columns.extend(sorted(encountered_statuses.difference(status_columns)))
+
+    csv_file_path = os.path.join(output_dir, filename)
+    with open(csv_file_path, 'w', newline='', encoding='utf-8') as csv_file:
+        writer = csv.writer(csv_file)
+        writer.writerow(['schoolDomain', *status_columns])
+
+        for school in sorted(summary.keys()):
+            writer.writerow([
+                school,
+                *[summary[school].get(status, 0) for status in status_columns]
+            ])
+
+    print(f"Status summary written → {csv_file_path}")
+
+# ────────────────────────────────────────────────────────────────────────────────
+# Main execution flow
+# ────────────────────────────────────────────────────────────────────────────────
 
 if __name__ == '__main__':
-    chrome_devices = list_chrome_devices()
+    devices = list_chrome_devices()
 
-    # Write all devices to a single CSV file
-    write_to_csv(chrome_devices, 'all_google_device_data_all.csv')
+    # 1️⃣ Full inventory (all devices)
+    write_raw_devices_csv(devices, 'all_google_device_data_all.csv')
 
-    # Organize devices by domain
-    domain_devices = {}
-    for device in chrome_devices:
+    # 2️⃣ Per‑school inventory files
+    buckets: Dict[str, List[dict]] = defaultdict(list)
+    for device in devices:
         org_unit_path = device.get('orgUnitPath', '')
-        domain = org_unit_path.split('/')[1] if '/' in org_unit_path else 'root'
-        sanitized_domain = sanitize_domain(domain)
-        if sanitized_domain not in domain_devices:
-            domain_devices[sanitized_domain] = []
-        domain_devices[sanitized_domain].append(device)
+        first_segment = org_unit_path.strip('/').split('/')[0] if org_unit_path else ''
+        domain_key = first_segment or 'root'
+        buckets[sanitize_domain(domain_key)].append(device)
 
-    # Write devices to separate domain-specific files
-    for domain, devices in domain_devices.items():
-        file_name = f'all_google_device_data_{domain}.csv'
-        if domain == '':
-            file_name = 'all_google_device_data_root.csv'
-        write_to_csv(devices, file_name)
+    for domain_key, bucket in buckets.items():
+        fname = f'all_google_device_data_{domain_key}.csv'
+        write_raw_devices_csv(bucket, fname)
 
-print("Getting google device data took --- %s seconds ---" % (time.time() - start_time))
+    # 3️⃣ Status summary across **all** schools
+    write_status_summary(devices)
+
+    print("Google device export completed in %.2f s" % (time.time() - start_time))
