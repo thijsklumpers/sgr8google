@@ -100,37 +100,52 @@ def write_raw_devices_csv(devices: List[dict], filename: str) -> None:
     print(f"Raw CSV written → {csv_file_path}")
 
 
-def write_status_summary(devices: List[dict], filename: str = 'google_device_status_summary.csv') -> None:
-    """Write a CSV containing counts per *schoolDomain* for every status in
-    ``STATUSES_OF_INTEREST`` (plus any new/unknown ones). Devices located in the
-    tenant root OU are reported as ``@root``.
-    """
+def write_status_summary(devices: List[dict],
+                         filename: str = 'google_device_status_summary.csv') -> None:
+    """Write a CSV with per-school counts *and* a TOTAL column / row."""
 
-    # Prepare data → {schoolDomain: {status: count}}
+    # ── build the per-school counts ───────────────────────────────────────────
     summary: Dict[str, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
-
     for device in devices:
         org_unit_path: str = device.get('orgUnitPath', '')
         first_segment = org_unit_path.strip('/').split('/')[0] if org_unit_path else ''
-        school_domain = first_segment or ROOT_DISPLAY  # '@root' if blank
-
+        school_domain = first_segment or ROOT_DISPLAY          # '@root' if blank
         status = device.get('status', 'UNKNOWN').upper()
         summary[school_domain][status] += 1
 
-    # Determine all status columns (pre‑defined + any new ones we encountered)
-    encountered_statuses = {status for counts in summary.values() for status in counts}
-    status_columns: List[str] = [s for s in STATUSES_OF_INTEREST if s in encountered_statuses]
+    # ── figure out the status columns we actually need ───────────────────────
+    encountered_statuses = {s for counts in summary.values() for s in counts}
+    status_columns: List[str] = [s for s in STATUSES_OF_INTEREST
+                                 if s in encountered_statuses]
     status_columns.extend(sorted(encountered_statuses.difference(status_columns)))
 
+    # ── grand totals across all schools ───────────────────────────────────────
+    grand_totals: Dict[str, int] = defaultdict(int)
+    for school_counts in summary.values():
+        for status, cnt in school_counts.items():
+            grand_totals[status] += cnt
+    grand_total_devices = sum(grand_totals.values())
+
+    # ── write the CSV ─────────────────────────────────────────────────────────
     csv_file_path = os.path.join(output_dir, filename)
     with open(csv_file_path, 'w', newline='', encoding='utf-8') as csv_file:
         writer = csv.writer(csv_file)
-        writer.writerow(['schoolDomain', *status_columns])
 
+        # header now includes an extra “TOTAL” column
+        writer.writerow(['schoolDomain', *status_columns, 'TOTAL'])
+
+        # grand-total row
+        writer.writerow(['TOTAL',
+                         *[grand_totals.get(s, 0) for s in status_columns],
+                         grand_total_devices])
+
+        # per-school rows
         for school in sorted(summary.keys()):
+            row_total = sum(summary[school].get(s, 0) for s in status_columns)
             writer.writerow([
                 school,
-                *[summary[school].get(status, 0) for status in status_columns]
+                *[summary[school].get(s, 0) for s in status_columns],
+                row_total
             ])
 
     print(f"Status summary written → {csv_file_path}")
