@@ -1,15 +1,12 @@
 import subprocess
 import os
 import time
-from colorama import Fore, Style, init
+import tkinter as tk
+from tkinter import ttk, scrolledtext
+import webbrowser
 
 # Get the current working directory dynamically
 base_dir = os.path.dirname(os.path.abspath(__file__))
-
-# Initialize colorama
-init()
-
-start_time = time.time()
 
 #---------------------------------#
 # Build paths to the script files #
@@ -28,92 +25,77 @@ google_device_data_pull_path = os.path.join(base_dir, '../scripts/device/google_
 csv_device_data_merge_path = os.path.join(base_dir, '../scripts/device/csv_device_data_merge.py')
 device_data_update_path = os.path.join(base_dir, '../scripts/device/device_data_update.py')
 
-#----------------------------#
-# Data gathering and cleanup #
-#----------------------------#
+def run_script(script_path, output_widget):
+    output_widget.insert(tk.END, f"--- Running {os.path.basename(script_path)} ---\n")
+    output_widget.see(tk.END)
+    process = subprocess.Popen(['python', script_path], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, creationflags=subprocess.CREATE_NO_WINDOW) 
+    
+    for line in iter(process.stdout.readline, ''):
+        output_widget.insert(tk.END, line)
+        # Check for file paths and make them clickable
+        if "file://" in line:
+            start_index = line.find("file://")
+            end_index = len(line)
+            path = line[start_index:].strip()
+            make_clickable(output_widget, path)
+        output_widget.see(tk.END)
+    
+    process.stdout.close()
+    return_code = process.wait()
+    output_widget.insert(tk.END, f"--- Finished {os.path.basename(script_path)} with exit code {return_code}---\n")
+    output_widget.see(tk.END)
 
-# Users
-def run_google_user_data_pull():
-    print(Fore.RED + "Started: google_user_data_pull.py ...")
-    print(Style.RESET_ALL + "google_user_data_pull.py logs:")
-    subprocess.run(['python', google_user_data_pull_path])
+def make_clickable(widget, path):
+    tag_name = f"link-{path}"
+    widget.tag_configure(tag_name, foreground="blue", underline=True)
+    widget.tag_bind(tag_name, "<Button-1>", lambda e, p=path: webbrowser.open(p))
+    
+    # Apply the tag to the path
+    start_index = widget.search(path, "1.0", tk.END)
+    end_index = f"{start_index}+{len(path)}c"
+    widget.tag_add(tag_name, start_index, end_index)
 
-def run_csv_user_data_merge():
-    print(Fore.RED + "Started: csv_user_data_merge.py ...")
-    print(Style.RESET_ALL + "csv_user_data_merge.py logs:")
-    subprocess.run(['python', csv_user_data_merge_path])
+def create_gui():
+    root = tk.Tk()
+    root.title("Google Workspace Control Panel")
 
-def run_csv_user_data_splitting():
-    print(Fore.RED + "Started: csv_user_data_splitting.py ...")
-    print(Style.RESET_ALL + "csv_user_data_splitting.py logs:")
-    subprocess.run(['python', csv_user_data_splitting_path])
+    main_frame = ttk.Frame(root, padding="10")
+    main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
 
-# Devices
-def run_google_device_data_pull():
-    print(Fore.RED + "Started: google_device_data_pull.py ...")
-    print(Style.RESET_ALL + "google_device_data_pull.py logs:")
-    subprocess.run(['python', google_device_data_pull_path])
+    # --- Buttons ---
+    button_frame = ttk.LabelFrame(main_frame, text="Actions")
+    button_frame.grid(row=0, column=0, padx=5, pady=5, sticky=(tk.N, tk.S))
 
-def run_csv_device_data_merge():
-    print(Fore.RED + "Started: csv_device_data_merge.py ...")
-    print(Style.RESET_ALL + "csv_device_data_merge.py logs:")
-    subprocess.run(['python', csv_device_data_merge_path])
+    scripts = {
+        "Pull Google User Data": google_user_data_pull_path,
+        "Merge CSV User Data": csv_user_data_merge_path,
+        "Split CSV User Data": csv_user_data_splitting_path,
+        "Pull Google Device Data": google_device_data_pull_path,
+        "Merge CSV Device Data": csv_device_data_merge_path,
+        "Update Device Data": device_data_update_path,
+        "Move Suspended Users": move_suspended_users_path,
+        "Move Admin Users": move_admin_users_path,
+        "Move Users to OU": move_users_to_ou_path,
+    }
 
-#---------------#
-# Updating data #
-#---------------#
-def run_device_data_update():
-    print(Fore.RED + "Started: device_data_update.py ...")
-    print(Style.RESET_ALL + "device_data_update.py logs:")
-    subprocess.run(['python', device_data_update_path])
+    row = 0
+    for name, path in scripts.items():
+        button = ttk.Button(button_frame, text=name, command=lambda p=path: run_script(p, output_text))
+        button.grid(row=row, column=0, padx=5, pady=5, sticky=tk.W)
+        row += 1
 
-#----------------#
-# Moving of data #
-#----------------#
-# Moving of users to there correct OU's / If the OU doesn't exist yet they will be created
-def run_move_suspended_users():
-    print(Fore.RED + "Started: move_suspended_users.py ...")
-    print(Style.RESET_ALL + "move_suspended_users.py logs:")
-    subprocess.run(['python', move_suspended_users_path])
+    # --- Output ---
+    output_frame = ttk.LabelFrame(main_frame, text="Output")
+    output_frame.grid(row=0, column=1, padx=5, pady=5, sticky=(tk.W, tk.E, tk.N, tk.S))
+    
+    output_text = scrolledtext.ScrolledText(output_frame, wrap=tk.WORD, width=80, height=25)
+    output_text.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
 
-def run_move_admin_users():
-    print(Fore.RED + "Started: move_admin_users.py ...")
-    print(Style.RESET_ALL + "move_admin_users.py logs:")
-    subprocess.run(['python', move_admin_users_path])
+    root.columnconfigure(0, weight=1)
+    root.rowconfigure(0, weight=1)
+    main_frame.columnconfigure(1, weight=1)
 
-def run_move_users_to_ou():
-    print(Fore.RED + "Started: move_users_to_ou.py ...")
-    print(Style.RESET_ALL + "move_users_to_ou.py logs:")
-    subprocess.run(['python', move_users_to_ou_path])
-
-
+    root.mainloop()
 
 if __name__ == '__main__':
-    # Execute the scripts in the desired order
-
-    #----------------------------#
-    # Data gathering and cleanup #
-    #----------------------------#
-    # Users
-    run_google_user_data_pull()
-    run_csv_user_data_merge()
-    run_csv_user_data_splitting()
-    # Devices
-    run_google_device_data_pull()
-    run_csv_device_data_merge()
-
-    #---------------#
-    # Updating data #
-    #---------------#
-
-    
-
-    #----------------#
-    # Moving of data #
-    #----------------#
-    # Moving of users to there correct OU's / If the OU doesn't exist yet they will be created
-    run_move_suspended_users()
-    run_move_admin_users()
-    # run_move_users_to_ou()
-
-print(Fore.GREEN + "Full process finished in --- %s seconds ---" % (time.time() - start_time))
+    create_gui()

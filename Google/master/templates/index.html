@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google Workspace Control Panel</title>
+    <style>
+        body { font-family: sans-serif; margin: 0; display: flex; height: 100vh; }
+        #sidebar { width: 250px; background: #f0f0f0; padding: 15px; border-right: 1px solid #ccc; }
+        #sidebar h2 { margin-top: 0; }
+        #sidebar button { display: block; width: 100%; padding: 10px; margin-bottom: 10px; text-align: left; }
+        #main-content { flex-grow: 1; padding: 15px; display: flex; flex-direction: column; }
+        #output { flex-grow: 1; background: #1e1e1e; color: #d4d4d4; padding: 10px; overflow-y: scroll; white-space: pre-wrap; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <div id="sidebar">
+        <h2>Actions</h2>
+        {% for script_name in scripts %}
+        <button onclick="runScript('{{ script_name }}')">{{ script_name }}</button>
+        {% endfor %}
+    </div>
+    <div id="main-content">
+        <h2>Output</h2>
+        <div id="output"></div>
+    </div>
+
+    <script>
+        async function runScript(scriptName) {
+            const outputDiv = document.getElementById('output');
+            outputDiv.textContent = ''; // Clear previous output
+
+            const response = await fetch(`/run_script/${scriptName}`);
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) {
+                    break;
+                }
+                outputDiv.textContent += decoder.decode(value, { stream: true });
+                outputDiv.scrollTop = outputDiv.scrollHeight; // Scroll to bottom
+            }
+        }
+    </script>
+</body>
+</html>

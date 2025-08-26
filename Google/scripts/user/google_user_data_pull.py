@@ -101,7 +101,7 @@ def write_to_csv(users: list[dict]) -> None:
                 'updated':       user.get('updated', '')
             })
 
-    print(f"CSV written ➜ {csv_path}")
+    print(f"CSV written -> {csv_path}")
 
 
 # ──────────────────────────────────────────────────────────────
